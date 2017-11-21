@@ -4,6 +4,7 @@ import nltk
 import random
 import collections
 import numpy as np
+import pickle
 
 ### read data ###
 def read_data_set(data_path):
@@ -121,6 +122,16 @@ def build_vocabulary_with_glove(dataframe, glove_dic, vocabulary_size = 50000):
         word2vec_embedding[i] = word2vec_embedding[i]/np.linalg.norm(word2vec_embedding[i])
     
     return index_to_word_map, word_to_index_map, word2vec_embedding
+
+def save_embedding(embedding, file_name):
+    '''
+    save_embedding
+    @param embedding: embedding matrix
+    @para file_name: file name to save
+    '''
+    with open(file_name, 'wb') as handle:
+        pickle.dump(embedding, handle, protocol=pickle.HIGHEST_PROTOCOL)
+   
     
 ### Batch ###
 def batch_iter(dataframe, batch_size):
