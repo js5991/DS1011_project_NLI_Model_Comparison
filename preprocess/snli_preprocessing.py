@@ -2,7 +2,10 @@ import pandas as pd
 import os
 import nltk
 import random
+import collections
+import numpy as np
 
+### read data ###
 def read_data_set(data_path):
     """
     read dataset from data_path
@@ -28,7 +31,7 @@ def read_data_set(data_path):
         """
         token_list = ["<NULL>"]
         if parse:
-            token_list  = token_list + parse.replace("(", "").replace(")", "").strip().split()
+            token_list  = token_list + parse.lower().replace("(", "").replace(")", "").strip().split()
         return token_list
         
     
@@ -62,12 +65,69 @@ def read_data_set(data_path):
     return data[['sentence1_token', 'sentence2_token', 'sentence1_size', 'sentence2_size', 'onehot_label', 'max_size']]
 
 
+###Embeddings ####
+def loadGloveData(gloveFile):
+    '''
+    @para gloveFile: directory of glove.6B.300d.txt
+    @return: glove embedding dictionary
+    '''
+    f = open(gloveFile,'r')
+    dic = {}
+    for line in f:
+        splitLine = line.split()
+        word = splitLine[0]
+        embedding = np.array([float(val) for val in splitLine[1:]])
+        dic[word] = embedding
+    return dic
 
+def build_vocabulary_with_glove(dataframe, glove_dic, vocabulary_size = 50000):
+    '''
+    build the vocabulary
+    @para dataframe: training data set
+    @return: index_to_word_map, word_to_index_map
+    '''
+    word_counter = {}
+    for tokens in dataframe['sentence1_token']:
+        for token in tokens:
+            if token in glove_dic:
+                if token in word_counter:
+                    word_counter[token]+= 1
+                else:
+                    word_counter[token] = 1
+        
+    for tokens in dataframe['sentence2_token']:
+        for token in tokens:
+            if token in glove_dic:
+                if token in word_counter:
+                    word_counter[token]+= 1
+                else:
+                    word_counter[token] = 1 
+
+    vocabulary = sorted(word_counter, key=lambda key: word_counter[key], reverse=True)[0:vocabulary_size - 100]
+    for i in range(1,101): 
+        oov_word = '<oov'+ str(i) + '>'
+        vocabulary.append(oov_word)
+        
+    index_to_word_map = dict(enumerate(vocabulary))
+    word_to_index_map = dict([(index_to_word_map[index], index) for index in index_to_word_map])
+    
+    #load glove embedding and initialize oov embedding
+    word2vec_embedding = np.random.normal(size = (len(index_to_word_map), 300))
+    for i in range(len(index_to_word_map)):
+        if index_to_word_map[i] in glove_dic:
+            word2vec_embedding[i] = glove_dic[index_to_word_map[i]]
+            
+    for i in range(len(word2vec_embedding)):
+        word2vec_embedding[i] = word2vec_embedding[i]/np.linalg.norm(word2vec_embedding[i])
+    
+    return index_to_word_map, word_to_index_map, word2vec_embedding
+    
+### Batch ###
 def batch_iter(dataframe, batch_size):
     
     def pad_sentence(token_list, pad_length):
         """
-        PAD 0 in front of the token_list
+        PAD in front of the token_list
         @param token_list:
         @param pad_length: 
         @return: padded_list
@@ -113,5 +173,6 @@ def batch_iter(dataframe, batch_size):
             
         yield [batch['padded_sentence1'].tolist(), batch['padded_sentence2'].tolist(), batch['onehot_label'].tolist()]
     
-   
+
+
     
