@@ -76,7 +76,7 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
 
     best_acc = 0
 
-    # for epoch in range(epoch_number):
+    #for epoch in range(epoch_number):
     for epoch in range(2):
         total = 0
         correct = 0
@@ -84,7 +84,7 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
         step_size_per_epoch = int(len(train_set) / batch_size)
         epoch_timer = time.time()
 
-        # for i in range(step_size_per_epoch):
+        #for i in range(step_size_per_epoch):
         for i in range(2):
             timer = time.time()
             loss_data = 0
@@ -150,20 +150,30 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
             inter_atten_optimizer.step()
 
             _, predict = prob.data.max(dim=1)
+            # print("predicted")
+            # print(predict)
+            #print("actual label")
+            # print(label_var.data)
             total += batch_size
             correct += torch.sum(predict == label_var.data)
             loss_data += (loss.data[0] * batch_size)
-            print(correct / total)
+            # print(correct)
+            #print(correct / float(total))
 
             if i % display_minibatch_batch == 0:
+                print("predicted")
+                print(torch.t(predict))
+                print("actual label")
+                print(torch.t(label_var.data))
+
                 print('epoch: {}, batches: {}|{}, train-acc: {}, loss: {}, para-norm: {}, grad-norm: {}, time : {}s '.format
-                      (epoch, i + 1, step_size_per_epoch, correct / total,
-                       loss_data / total, para_norm, grad_norm, time.time() - timer))
+                      (epoch, i + 1, step_size_per_epoch, correct / float(total),
+                       loss_data / float(total), para_norm, grad_norm, time.time() - timer))
 
         epoch_time = time.time() - epoch_timer
         print('epoch: {}, train-acc: {}, loss: {}, para-norm: {}, grad-norm: {}, time : {}s '.format
-              (epoch, correct / total,
-               loss_data / total, para_norm, grad_norm, epoch_time))
+              (epoch, correct / float(total),
+               loss_data / float(total), para_norm, grad_norm, epoch_time))
 
         valid_timer = time.time()
         valid_accuracy, valid_loss = evaluate(inter_atten, input_encoder, valid_data_batch, use_cuda)
@@ -218,6 +228,7 @@ def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
         prob = inter_atten(embed_1, embed_2)
 
         _, predicted = prob.data.max(dim=1)
+
         total += label_var.size(0)
         correct += (predicted == label_var.data).sum()
         criterion = nn.NLLLoss(size_average=True)

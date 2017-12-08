@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-import nltk
+#import nltk
 import random
 import collections
 import numpy as np
