@@ -31,8 +31,8 @@ def read_data_set(data_path):
         @return: token of the parsed sentence
         """
         token_list = ["<NULL>"]
-        if parse:
-            token_list  = token_list + parse.lower().replace("(", "").replace(")", "").strip().split()
+        if pd.isnull(parse) == False:
+            token_list  = token_list + parse.replace("(", "").replace(")", "").strip().lower().split()
         return token_list
         
     
@@ -42,12 +42,16 @@ def read_data_set(data_path):
         Return a onehot vector of [1,0,0] for entailment, [0,1,0] for contradiction, and  [0,0,1] for neutral
         """
         labels = {'entailment':0, 'contradiction':1, 'neutral':2}
+        return labels[label]
+        
+        '''
         try:
             onehot = [0,0,0]
             onehot[labels[label]] = 1
             return onehot
         except:
             return None
+        '''
     
     data = pd.read_csv(data_path,delimiter="\t")
     data = data[data["gold_label"] != "-"]
@@ -104,7 +108,9 @@ def build_vocabulary_with_glove(dataframe, glove_dic, vocabulary_size = 50000):
                 else:
                     word_counter[token] = 1 
 
-    vocabulary = sorted(word_counter, key=lambda key: word_counter[key], reverse=True)[0:vocabulary_size - 100]
+    vocabulary = sorted(word_counter, key=lambda key: word_counter[key], reverse=True)[0:vocabulary_size - 102]
+    vocabulary.append('<PAD>')
+    vocabulary.append('<NULL>')
     for i in range(1,101): 
         oov_word = '<oov'+ str(i) + '>'
         vocabulary.append(oov_word)
@@ -113,7 +119,7 @@ def build_vocabulary_with_glove(dataframe, glove_dic, vocabulary_size = 50000):
     word_to_index_map = dict([(index_to_word_map[index], index) for index in index_to_word_map])
     
     #load glove embedding and initialize oov embedding
-    word2vec_embedding = np.random.normal(size = (len(index_to_word_map), 300))
+    word2vec_embedding = np.random.normal(loc=0.0, scale=0.01, size = (len(index_to_word_map), 300))
     for i in range(len(index_to_word_map)):
         if index_to_word_map[i] in glove_dic:
             word2vec_embedding[i] = glove_dic[index_to_word_map[i]]
@@ -134,7 +140,7 @@ def save_embedding(embedding, file_name):
    
     
 ### Batch ###
-def batch_iter(dataframe, batch_size):
+def batch_iter(dataframe, batch_size, vocabulary):
     
     def pad_sentence(token_list, pad_length):
         """
@@ -146,6 +152,21 @@ def batch_iter(dataframe, batch_size):
         padding = ["<PAD>"] * (pad_length - len(token_list))
         padded_list = padding + token_list
         return padded_list
+
+    def update_unknown_token(token_list, vocabulary):
+        """
+        update the unknown token 
+        A unknown word is randomly assigned to one of the oov1 - oov100
+        @param token_list:
+        @param vocabulary: 
+        @return: token_list with oov assigned
+        """
+        if len(token_list)>0:
+            for i in range(len(token_list)):
+                if token_list[i] not in vocabulary:
+                    token_list[i]  = "<oov"+str(random.randint(1,100))+">"
+                token_list[i] = vocabulary[token_list[i]]
+        return token_list
     
     def shuffle_based_on_length (dataframe):
         '''
@@ -157,7 +178,6 @@ def batch_iter(dataframe, batch_size):
         index_other = dataframe.index[dataframe['max_size'] > 50].tolist()
         index_of_len_less_50 = list(set(dataframe.index.tolist()) - set(index_of_len_less_20) - set(index_other))
         
-
         random.shuffle(index_of_len_less_20)
         random.shuffle(index_of_len_less_50)
         random.shuffle(index_other)
@@ -181,8 +201,11 @@ def batch_iter(dataframe, batch_size):
         max_length = batch['max_size'].max()
         batch['padded_sentence1'] = batch.apply(lambda row: pad_sentence(row['sentence1_token'], max_length), axis=1)
         batch['padded_sentence2'] = batch.apply(lambda row: pad_sentence(row['sentence2_token'], max_length), axis=1)
-            
-        yield [batch['padded_sentence1'].tolist(), batch['padded_sentence2'].tolist(), batch['onehot_label'].tolist()]
+        
+        batch['sentence1'] = batch.apply(lambda row: update_unknown_token(row['padded_sentence1'], vocabulary), axis=1)
+        batch['sentence2'] = batch.apply(lambda row: update_unknown_token(row['padded_sentence2'], vocabulary), axis=1)
+
+        yield [batch['sentence1'].tolist(), batch['sentence2'].tolist(), batch['onehot_label'].tolist()]
     
 
 
