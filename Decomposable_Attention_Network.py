@@ -1,9 +1,9 @@
 
-
-# In[5]:
-
 import preprocess.snli_preprocessing as pp
 import os
+import sys
+sys.path.append('./model')
+
 import pandas as pd
 
 import torch
@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.optim as optim
 
-import model.decomposable as model
+import decomposable as model
 import time
 import pickle
 
@@ -28,11 +28,12 @@ hidden_size = 200
 label_size = 3
 learning_rate = 1e-2
 weight_decay = 1e-5
-epoch_number = 50
+epoch_number = 100
 batch_size = 50
 display_minibatch_batch = 100
 note = "test"
-model_saving_dir ="saved_model/"
+model_saving_dir = "saved_model/"
+embedding_saved_dir = "saved_embedding/"
 
 
 def train(embedding, train_data_batch, valid_data_batch, use_cuda):
@@ -75,16 +76,16 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
 
     best_acc = 0
 
-    for epoch in range(epoch_number):
-    #for epoch in range(2):
-
+    # for epoch in range(epoch_number):
+    for epoch in range(2):
         total = 0
         correct = 0
 
         step_size_per_epoch = int(len(train_set) / batch_size)
         epoch_timer = time.time()
-        #for i in range(3):
-        for i in range(step_size_per_epoch):
+
+        # for i in range(step_size_per_epoch):
+        for i in range(2):
             timer = time.time()
             loss_data = 0
             sentence1, sentence2, label = next(train_data_batch)
@@ -187,11 +188,11 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
         train_statistics['valid_time'] = valid_times
 
         if valid_accuracy > best_acc:
-            torch.save(input_encoder.state_dict(), 'input_encoder' + '_' + note + '.pt')
-            torch.save(inter_atten.state_dict(), 'inter_atten' + '_' + note + '.pt')
+            torch.save(input_encoder.state_dict(), model_saving_dir + 'input_encoder' + '_' + note + '.pt')
+            torch.save(inter_atten.state_dict(), model_saving_dir + 'inter_atten' + '_' + note + '.pt')
             best_acc = valid_accuracy
 
-        pickle.dump(train_statistics, open(model_saving_dir+'training_history' + '_' + note + '.pk', 'wb'))
+        pickle.dump(train_statistics, open(model_saving_dir + 'training_history' + '_' + note + '.pk', 'wb'))
 
 
 def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
@@ -199,7 +200,7 @@ def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
     inter_atten.eval()
     correct = 0
     total = 0
-    #step = 0
+    step = 0
     loss_data = 0
     print("valuating the model")
     for batch in data_iter:
@@ -224,9 +225,9 @@ def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
         loss_data += (loss.data[0] * label_var.data.shape[0])
 
         # print(total)
-        #step += 1
-        #if step > 5:
-            #break
+        step += 1
+        if step > 5:
+            break
 
     input_encoder.train()
     inter_atten.train()
@@ -247,8 +248,8 @@ if __name__ == '__main__':
     idx2word, word2idx, embedding = pp.build_vocabulary_with_glove(train_set, glove_dic)
     #embedding = pickle.load(open('embedding' + '_' + note + '.pk', 'rb'))
     #word2idx = pickle.load(open('word2idx' + '_' + note + '.pk', 'rb'))
-    pickle.dump(embedding, open('embedding' + '_' + note + '.pk', 'wb'))
-    pickle.dump(word2idx, open('word2idx' + '_' + note + '.pk', 'wb'))
+    pickle.dump(embedding, open(embedding_saved_dir + 'embedding' + '_' + note + '.pk', 'wb'))
+    pickle.dump(word2idx, open(embedding_saved_dir + 'word2idx' + '_' + note + '.pk', 'wb'))
 
     print("batchfying both training and valid data")
     train_data_batch = pp.batch_iter(train_set, batch_size, word2idx)
@@ -257,5 +258,7 @@ if __name__ == '__main__':
     print("Time takes to process data: {}s".format(time.time() - begin_preprocess))
 
     use_cuda = torch.cuda.is_available()
+
+    print("Use cuda? : {}".format(use_cuda))
 
     train(embedding, train_data_batch, valid_data_batch, use_cuda)
