@@ -22,16 +22,16 @@ glove_path = "./data/glove.6B.300d.txt"
 train_file = "snli_1.0_train.txt"
 valid_file = "snli_1.0_dev.txt"
 
-accu_value = 0.1
-parameter_std = 0.01
-hidden_size = 200
+accu_value = 0.1  # 0.1
+parameter_std = 0.01  # 0.01
+hidden_size = 200  # 200
 label_size = 3
-learning_rate = 1e-2
-weight_decay = 1e-5
+learning_rate = 1e-1
+weight_decay = 1e-5  # 1e-5
 epoch_number = 100
-batch_size = 50
+batch_size = 32
 display_minibatch_batch = 100
-note = "test"
+note = "decomposable_wd_1e-5_std_1e-2_av_0.1_hs_200_epoch100"
 model_saving_dir = "saved_model/"
 embedding_saved_dir = "saved_embedding/"
 
@@ -54,15 +54,6 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
     input_optimizer = optim.Adagrad(para1, lr=learning_rate, weight_decay=weight_decay)
     inter_atten_optimizer = optim.Adagrad(para2, lr=learning_rate, weight_decay=weight_decay)
 
-    for group in input_optimizer.param_groups:
-        for p in group['params']:
-            state = input_optimizer.state[p]
-            state['sum'] += accu_value
-    for group in inter_atten_optimizer.param_groups:
-        for p in group['params']:
-            state = inter_atten_optimizer.state[p]
-            state['sum'] += accu_value
-
     criterion = nn.NLLLoss(size_average=True)
 
     train_losses = []
@@ -76,18 +67,18 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
 
     best_acc = 0
 
-    #for epoch in range(epoch_number):
-    for epoch in range(2):
+    for epoch in range(epoch_number):
+        # for epoch in range(2):
         total = 0
         correct = 0
+        loss_data = 0
 
         step_size_per_epoch = int(len(train_set) / batch_size)
         epoch_timer = time.time()
 
-        #for i in range(step_size_per_epoch):
-        for i in range(2):
+        for i in range(step_size_per_epoch):
+            # for i in range(2):
             timer = time.time()
-            loss_data = 0
             sentence1, sentence2, label = next(train_data_batch)
             input_encoder.train()
             inter_atten.train()
@@ -106,8 +97,18 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
             input_encoder.zero_grad()
             inter_atten.zero_grad()
 
+            for group in input_optimizer.param_groups:
+                for p in group['params']:
+                    state = input_optimizer.state[p]
+                    state['sum'] += accu_value
+            for group in inter_atten_optimizer.param_groups:
+                for p in group['params']:
+                    state = inter_atten_optimizer.state[p]
+                    state['sum'] += accu_value
+
             embed_1, embed_2 = input_encoder(sentence1_var, sentence2_var)  # batch_size * length * embedding_dim
             prob = inter_atten(embed_1, embed_2)
+
             # print(prob)
             loss = criterion(prob, label_var)
             loss.backward()
@@ -117,6 +118,7 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
 
             for m in input_encoder.modules():
                 if isinstance(m, nn.Linear):
+                    # print(m.weight.grad.data.cpu())
                     grad_norm += m.weight.grad.data.norm() ** 2
                     para_norm += m.weight.data.norm() ** 2
                     if m.bias:
@@ -146,25 +148,29 @@ def train(embedding, train_data_batch, valid_data_batch, use_cuda):
                         m.weight.grad.data = m.weight.grad.data * shrinkage
                         m.bias.grad.data = m.bias.grad.data * shrinkage
 
+            #print("before opt.step()")
+            #print(para1)
+
             input_optimizer.step()
             inter_atten_optimizer.step()
+            ###
+
+            #print("after opt.step()")
+            #for para in para1:
+            #    print(para.data.cpu())
+            # print(para1)
 
             _, predict = prob.data.max(dim=1)
-            # print("predicted")
-            # print(predict)
-            #print("actual label")
-            # print(label_var.data)
+
             total += batch_size
             correct += torch.sum(predict == label_var.data)
             loss_data += (loss.data[0] * batch_size)
-            # print(correct)
-            #print(correct / float(total))
 
             if i % display_minibatch_batch == 0:
                 print("predicted")
-                print(torch.t(predict))
+                print(predict.cpu().numpy())
                 print("actual label")
-                print(torch.t(label_var.data))
+                print(label_var.data.cpu().numpy())
 
                 print('epoch: {}, batches: {}|{}, train-acc: {}, loss: {}, para-norm: {}, grad-norm: {}, time : {}s '.format
                       (epoch, i + 1, step_size_per_epoch, correct / float(total),
@@ -210,11 +216,11 @@ def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
     inter_atten.eval()
     correct = 0
     total = 0
-    step = 0
+    #step = 0
     loss_data = 0
     print("valuating the model")
-    for batch in data_iter:
-        sentence1, sentence2, label = batch
+    for i in range(int(len(valid_set) / batch_size)):
+        sentence1, sentence2, label = next(data_iter)
         if use_cuda:
             sentence1_var = Variable(torch.LongTensor(sentence1).cuda())
             sentence2_var = Variable(torch.LongTensor(sentence2).cuda())
@@ -236,9 +242,9 @@ def evaluate(inter_atten, input_encoder, data_iter, use_cuda):
         loss_data += (loss.data[0] * label_var.data.shape[0])
 
         # print(total)
-        step += 1
-        if step > 5:
-            break
+        #step += 1
+        # if step > 5:
+        #    break
 
     input_encoder.train()
     inter_atten.train()

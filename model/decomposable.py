@@ -61,7 +61,7 @@ class atten(nn.Module):
         self.final_linear = nn.Linear(
             self.hidden_size, self.label_size, bias=True)
 
-        self.log_prob = nn.LogSoftmax()
+        self.log_prob = nn.LogSoftmax(dim=0)
 
         '''initialize parameters'''
         for m in self.modules():
@@ -101,13 +101,13 @@ class atten(nn.Module):
 
         score1 = torch.bmm(f1, torch.transpose(f2, 1, 2))
         # e_{ij} batch_size x len1 x len2
-        prob1 = F.softmax(score1.view(-1, len2), dim=1).view(-1, len1, len2)
+        prob1 = F.softmax(score1.view(-1, len2), dim=0).view(-1, len1, len2)
         # batch_size x len1 x len2
 
         score2 = torch.transpose(score1.contiguous(), 1, 2)
         score2 = score2.contiguous()
         # e_{ji} batch_size x len2 x len1
-        prob2 = F.softmax(score2.view(-1, len1), dim=1).view(-1, len2, len1)
+        prob2 = F.softmax(score2.view(-1, len1), dim=0).view(-1, len2, len1)
         # batch_size x len2 x len1
 
         sent1_combine = torch.cat(
