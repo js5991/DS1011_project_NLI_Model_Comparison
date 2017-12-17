@@ -2,6 +2,7 @@ import numpy as np
 import random
 import json
 from operator import add
+import random
 
 UNKNOWN = '<UNK>'  # 0
 PADDING = '<PAD>'  # 1
@@ -163,6 +164,7 @@ def batch_iter(dataset, batch_size, use_ngram=False, shuffle=False):
 
     if shuffle:
         semi_sort_data(dataset)
+        random.shuffle(dataset)
 
     index_list = list(range(len(dataset)))
 
@@ -176,6 +178,7 @@ def batch_iter(dataset, batch_size, use_ngram=False, shuffle=False):
             start = 0
             if shuffle:
                 semi_sort_data(dataset)
+                random.shuffle(dataset)
         batch_indices = index_list[start:start + batch_size]
         batch = [dataset[index] for index in batch_indices]
         for k in batch:
@@ -206,10 +209,3 @@ def batch_iter(dataset, batch_size, use_ngram=False, shuffle=False):
                 item.extend([100] * (max_length_hypo - len(item)))
 
         yield [label, premise, hypothesis]
-
-
-if __name__ == '__main__':
-    # Test
-    vocab, word_embeddings, word_to_index, index_to_word = load_embedding_and_build_vocab('../data/fasttext.simple.300d')
-    dev_set = process_snli('../data/snli_1.0_dev.jsonl', word_to_index, to_lower=True)
-    dev_iter = batch_iter(dataset=dev_set, batch_size=4, shuffle=True)

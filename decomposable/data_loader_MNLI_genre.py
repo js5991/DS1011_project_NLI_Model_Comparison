@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import json
+import random
 
 
 def process_mnli(file_path, word_to_index, to_lower):
@@ -100,6 +101,7 @@ def batch_iter(dataset, batch_size, shuffle):
 
     if shuffle:
         semi_sort_data(dataset)
+        random.shuffle(dataset)
 
     index_list = list(range(len(dataset)))
 
@@ -111,6 +113,9 @@ def batch_iter(dataset, batch_size, shuffle):
         genre = []
         if start > dataset_size - batch_size:
             start = 0
+            if shuffle:
+                semi_sort_data(dataset)
+                random.shuffle(dataset)
         batch_indices = index_list[start:start + batch_size]
         batch = [dataset[index] for index in batch_indices]
         for k in batch:
@@ -125,10 +130,3 @@ def batch_iter(dataset, batch_size, shuffle):
         for item in hypothesis:
             item.extend([100] * (max_length_hypo - len(item)))
         yield [label, premise, hypothesis, genre]
-
-
-if __name__ == '__main__':
-    # Test
-    vocab, word_embeddings, word_to_index, index_to_word = load_embedding_and_build_vocab('./data/glove.6B.300d.txt')
-    dev_set = process_mnli('./data/multinli_1.0/multinli_1.0_dev_mismatched.jsonl', word_to_index, to_lower=True)
-    dev_iter = batch_iter(dataset=dev_set, batch_size=4, shuffle=True)
